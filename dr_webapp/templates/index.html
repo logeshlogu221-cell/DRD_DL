@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RetinaAI — Diabetic Retinopathy Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #050a14;
+    --bg2:       #0a1628;
+    --bg3:       #0f1f3d;
+    --border:    rgba(99,179,237,0.12);
+    --border2:   rgba(99,179,237,0.25);
+    --text:      #e8f0ff;
+    --muted:     #7a90b8;
+    --accent:    #3b82f6;
+    --accent2:   #60a5fa;
+    --glow:      rgba(59,130,246,0.3);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glowing orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+  .orb-1 { width: 600px; height: 600px; background: #1d4ed8; top: -200px; left: -200px; animation: drift 20s ease-in-out infinite; }
+  .orb-2 { width: 500px; height: 500px; background: #7c3aed; bottom: -150px; right: -150px; animation: drift 25s ease-in-out infinite reverse; }
+  .orb-3 { width: 300px; height: 300px; background: #0ea5e9; top: 50%; left: 50%; transform: translate(-50%,-50%); animation: pulse-orb 8s ease-in-out infinite; }
+
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0); }
+    33%       { transform: translate(40px, -30px); }
+    66%       { transform: translate(-30px, 40px); }
+  }
+  @keyframes pulse-orb {
+    0%, 100% { opacity: 0.2; transform: translate(-50%,-50%) scale(1); }
+    50%       { opacity: 0.4; transform: translate(-50%,-50%) scale(1.3); }
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 3rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    background: rgba(5,10,20,0.7);
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem;
+    letter-spacing: -0.02em; color: var(--text);
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #3b82f6, #7c3aed);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .nav-badge {
+    font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em;
+    background: rgba(59,130,246,0.15); color: var(--accent2);
+    border: 1px solid rgba(59,130,246,0.3);
+    padding: 0.2rem 0.7rem; border-radius: 20px;
+  }
+  .nav-links {
+    display: flex; align-items: center; gap: 2rem;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--muted); font-size: 0.9rem; text-decoration: none;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative; z-index: 1;
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+    max-width: 780px; margin: 0 auto;
+  }
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent2); font-weight: 500;
+    border: 1px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.08);
+    padding: 0.35rem 1rem; border-radius: 20px;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s ease both;
+  }
+  .tag-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent2);
+    animation: blink 2s ease infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 800; line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.25rem;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+  .hero h1 span {
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #38bdf8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-size: 1.1rem; color: var(--muted); line-height: 1.75;
+    max-width: 560px; margin: 0 auto 2.5rem;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    position: relative; z-index: 1;
+    display: flex; justify-content: center; gap: 1rem;
+    flex-wrap: wrap; margin-bottom: 3rem;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+  .stat-pill {
+    display: flex; align-items: center; gap: 0.6rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    padding: 0.6rem 1.2rem; border-radius: 40px;
+    font-size: 0.85rem;
+  }
+  .stat-pill strong { color: var(--accent2); font-weight: 600; }
+
+  /* ── MAIN CARD ── */
+  .main-card {
+    position: relative; z-index: 1;
+    max-width: 900px; margin: 0 auto 4rem;
+    padding: 0 1.5rem;
+    animation: fadeUp 0.6s 0.35s ease both;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    padding: 3rem 2.5rem;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; cursor: pointer;
+    border: 2px dashed var(--border2);
+    margin: 1.5rem; border-radius: 16px;
+    transition: all 0.25s ease;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(59,130,246,0.05);
+  }
+  .upload-icon {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(124,58,237,0.2));
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; margin-bottom: 1.25rem;
+    transition: transform 0.25s;
+  }
+  .upload-zone:hover .upload-icon { transform: scale(1.08) translateY(-3px); }
+  .upload-zone h3 {
+    font-family: 'Syne', sans-serif; font-size: 1.15rem;
+    font-weight: 700; margin-bottom: 0.5rem;
+  }
+  .upload-zone p { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .upload-btn {
+    background: linear-gradient(135deg, #3b82f6, #7c3aed);
+    color: white; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 500;
+    padding: 0.65rem 1.75rem; border-radius: 10px;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .upload-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  #file-input { display: none; }
+
+  /* ── PREVIEW (before predict) ── */
+  #preview-section { display: none; padding: 1.5rem; }
+  .preview-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .preview-header h3 {
+    font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+  }
+  .change-btn {
+    font-size: 0.8rem; color: var(--muted); cursor: pointer;
+    background: none; border: 1px solid var(--border);
+    padding: 0.3rem 0.8rem; border-radius: 6px;
+    transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+  }
+  .change-btn:hover { color: var(--text); border-color: var(--border2); }
+  .preview-img-wrap {
+    width: 100%; max-width: 280px; margin: 0 auto 1.5rem;
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .preview-img-wrap img { width: 100%; display: block; }
+  .predict-btn {
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+    width: 100%; padding: 0.9rem;
+    background: linear-gradient(135deg, #3b82f6, #7c3aed);
+    color: white; border: none; border-radius: 12px; cursor: pointer;
+    font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+    letter-spacing: 0.02em;
+    transition: opacity 0.2s, transform 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .predict-btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .predict-btn:hover { opacity: 0.92; transform: translateY(-2px); }
+  .predict-btn:hover::after { opacity: 1; }
+  .predict-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* spinner */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RESULT SECTION ── */
+  #result-section { display: none; padding: 1.5rem; }
+
+  .result-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .result-header h3 {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+  }
+  .new-scan-btn {
+    font-size: 0.8rem; color: var(--accent2); cursor: pointer;
+    background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25);
+    padding: 0.35rem 0.9rem; border-radius: 8px;
+    transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+  }
+  .new-scan-btn:hover { background: rgba(59,130,246,0.2); }
+
+  /* diagnosis banner */
+  .diagnosis-banner {
+    border-radius: 16px; padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 1.25rem;
+    border: 1px solid;
+    animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  @keyframes scaleIn {
+    from { transform: scale(0.92); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .diagnosis-icon {
+    width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; background: rgba(255,255,255,0.08);
+  }
+  .diagnosis-label { font-size: 0.75rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-bottom: 0.2rem; }
+  .diagnosis-name { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+  .diagnosis-conf { font-size: 0.85rem; opacity: 0.75; margin-top: 0.2rem; }
+
+  /* severity meter */
+  .severity-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 1.5rem; padding: 1rem 1.25rem;
+    background: var(--bg3); border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .severity-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; min-width: 70px; }
+  .severity-dots { display: flex; gap: 0.4rem; flex: 1; }
+  .severity-dot {
+    flex: 1; height: 8px; border-radius: 4px;
+    background: var(--bg); transition: background 0.4s, box-shadow 0.4s;
+  }
+  .severity-dot.active { box-shadow: 0 0 10px currentColor; }
+
+  /* images comparison */
+  .images-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .img-card {
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .img-card-label {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.75rem; font-weight: 500; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .img-card img { width: 100%; display: block; }
+
+  /* probability bars */
+  .probs-section { margin-bottom: 1.5rem; }
+  .probs-title {
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;
+  }
+  .prob-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+  .prob-name { font-size: 0.82rem; color: var(--muted); min-width: 118px; }
+  .prob-bar-bg {
+    flex: 1; height: 8px; background: var(--bg3);
+    border-radius: 4px; overflow: hidden;
+  }
+  .prob-bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.34,1.2,0.64,1);
+    width: 0%;
+  }
+  .prob-val { font-size: 0.82rem; font-weight: 500; min-width: 48px; text-align: right; }
+
+  /* advice card */
+  .advice-card {
+    border-radius: 14px; padding: 1.25rem 1.5rem;
+    background: var(--bg3); border: 1px solid var(--border);
+    display: flex; gap: 1rem; align-items: flex-start;
+  }
+  .advice-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+  .advice-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem; }
+  .advice-text { font-size: 0.85rem; color: var(--muted); line-height: 1.65; }
+  .advice-action {
+    display: inline-block; margin-top: 0.75rem;
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.05em;
+    padding: 0.35rem 0.9rem; border-radius: 6px;
+    border: 1px solid; opacity: 0.9;
+  }
+
+  /* ── MODEL INFO SECTION ── */
+  .info-section {
+    position: relative; z-index: 1;
+    max-width: 900px; margin: 0 auto 5rem;
+    padding: 0 1.5rem;
+  }
+  .info-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+  }
+  @media(max-width:680px) { .info-grid { grid-template-columns: 1fr; } }
+  .info-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .info-card:hover { border-color: var(--border2); transform: translateY(-3px); }
+  .info-card-icon { font-size: 26px; margin-bottom: 0.75rem; }
+  .info-card h4 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .info-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.65; }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative; z-index: 1;
+    text-align: center; padding: 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 0.82rem;
+  }
+  footer span { color: var(--accent2); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── ERROR TOAST ── */
+  .toast {
+    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: #7f1d1d; border: 1px solid #ef4444; color: #fecaca;
+    padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 0.875rem;
+    transition: transform 0.3s ease; z-index: 100;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Disclaimer */
+  .disclaimer {
+    font-size: 0.72rem; color: var(--muted); opacity: 0.6;
+    text-align: center; padding: 0 2rem 1rem;
+    position: relative; z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="logo-icon">👁</div>
+    RetinaAI
+  </a>
+  <span class="nav-badge">DRCNNRB + CBAM · 98.29% Accuracy</span>
+  <ul class="nav-links">
+    <li><a href="#model-info">About</a></li>
+    <li><a href="https://www.kaggle.com/datasets/sovitrath/diabetic-retinopathy-2015-data-colored-resized" target="_blank">Dataset</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-tag">
+    <span class="tag-dot"></span>
+    AI-Powered Retinal Analysis
+  </div>
+  <h1>Detect <span>Diabetic Retinopathy</span><br>in Seconds</h1>
+  <p>Upload a retinal fundus image and get instant severity classification powered by DRCNNRB + CBAM deep learning — trained on 35,126 images across 5 severity classes.</p>
+</section>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-pill">🎯 <strong>98.29%</strong> Test Accuracy</div>
+  <div class="stat-pill">📊 <strong>0.9734</strong> Macro F1-Score</div>
+  <div class="stat-pill">🧠 <strong>26.5M</strong> Parameters</div>
+  <div class="stat-pill">🔬 <strong>5</strong> Severity Classes</div>
+  <div class="stat-pill">⚡ <strong>TTA×5</strong> Ensemble</div>
+</div>
+
+<!-- MAIN CARD -->
+<div class="main-card">
+  <div class="card">
+
+    <!-- Upload Zone -->
+    <div id="upload-section">
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-icon">🩺</div>
+        <h3>Upload Retinal Fundus Image</h3>
+        <p>Drag & drop or click to select · JPG, PNG supported</p>
+        <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+          Choose Image
+        </button>
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/jpg">
+      </div>
+    </div>
+
+    <!-- Preview Section -->
+    <div id="preview-section">
+      <div class="preview-header">
+        <h3>Image Ready</h3>
+        <button class="change-btn" onclick="resetToUpload()">Change image</button>
+      </div>
+      <div class="preview-img-wrap">
+        <img id="preview-img" src="" alt="Preview">
+      </div>
+      <button class="predict-btn" id="predict-btn" onclick="runPrediction()">
+        <div class="spinner" id="spinner"></div>
+        <span id="predict-label">🔬 Analyse Retina</span>
+      </button>
+    </div>
+
+    <!-- Result Section -->
+    <div id="result-section">
+      <div class="result-header">
+        <h3>Analysis Complete</h3>
+        <button class="new-scan-btn" onclick="resetToUpload()">+ New Scan</button>
+      </div>
+
+      <!-- Diagnosis Banner -->
+      <div class="diagnosis-banner" id="diagnosis-banner">
+        <div class="diagnosis-icon" id="diag-icon"></div>
+        <div>
+          <div class="diagnosis-label">Diagnosis</div>
+          <div class="diagnosis-name" id="diag-name"></div>
+          <div class="diagnosis-conf" id="diag-conf"></div>
+        </div>
+      </div>
+
+      <!-- Severity Meter -->
+      <div class="severity-row">
+        <span class="severity-label">Severity</span>
+        <div class="severity-dots" id="severity-dots">
+          <div class="severity-dot" data-level="0"></div>
+          <div class="severity-dot" data-level="1"></div>
+          <div class="severity-dot" data-level="2"></div>
+          <div class="severity-dot" data-level="3"></div>
+          <div class="severity-dot" data-level="4"></div>
+        </div>
+        <span id="severity-text" style="font-size:0.8rem;color:var(--muted);min-width:60px;text-align:right"></span>
+      </div>
+
+      <!-- Image Comparison -->
+      <div class="images-row">
+        <div class="img-card">
+          <div class="img-card-label">Original</div>
+          <img id="result-original" src="" alt="Original">
+        </div>
+        <div class="img-card">
+          <div class="img-card-label">Preprocessed</div>
+          <img id="result-preprocessed" src="" alt="Preprocessed">
+        </div>
+      </div>
+
+      <!-- Probability Bars -->
+      <div class="probs-section">
+        <div class="probs-title">Class Probabilities (TTA × 5)</div>
+        <div id="prob-bars"></div>
+      </div>
+
+      <!-- Advice -->
+      <div class="advice-card" id="advice-card">
+        <div class="advice-icon">💊</div>
+        <div>
+          <div class="advice-title">Clinical Recommendation</div>
+          <div class="advice-text" id="advice-text"></div>
+          <span class="advice-action" id="advice-action"></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODEL INFO -->
+<div class="info-section" id="model-info">
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card-icon">🏗️</div>
+      <h4>DRCNNRB Architecture</h4>
+      <p>CNN with 3 Residual Blocks (ConvBlock + 2× IdentityBlock) and skip connections to prevent vanishing gradients. 26.5M parameters total.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">🎯</div>
+      <h4>CBAM Attention</h4>
+      <p>Convolutional Block Attention Module applied after each ResBlock. Channel attention recalibrates feature responses; spatial attention highlights lesion regions.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">🔬</div>
+      <h4>Preprocessing Pipeline</h4>
+      <p>Circle crop → Gaussian median subtraction → Gamma correction (γ=1.2) → CLAHE adaptive histogram equalisation. All images normalised to 256×256.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">⚖️</div>
+      <h4>Class Imbalance Handling</h4>
+      <p>WeightedRandomSampler + Focal Loss (γ=2.0) + class-weighted loss. Proliferate_DR augmented ×7 from only 708 samples to 4,956.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">📈</div>
+      <h4>Training Results</h4>
+      <p>98.29% accuracy on 35,126 test images. Surpasses the paper baseline of 96.23%. Macro F1 = 0.9734. Proliferate_DR recall = 99.58%.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon">⚡</div>
+      <h4>TTA Inference</h4>
+      <p>Test-Time Augmentation averages predictions across 5 views (original, h-flip, v-flip, zoom, 90° rotate) for robust and reliable classification.</p>
+    </div>
+  </div>
+</div>
+
+<p class="disclaimer">⚠ This tool is for research and educational demonstration only. It is not a medical device and must not replace professional ophthalmologist diagnosis.</p>
+
+<footer>
+  Built with DRCNNRB + CBAM · PyTorch · Flask ·
+  Trained on <span>Diabetic Retinopathy 2015</span> dataset ·
+  <span>98.29%</span> accuracy
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CLASS_COLORS = {
+  "No_DR":         "#22c55e",
+  "Mild":          "#eab308",
+  "Moderate":      "#f97316",
+  "Severe":        "#ef4444",
+  "Proliferate_DR":"#a855f7"
+};
+const CLASS_ICONS = {
+  "No_DR": "✅", "Mild": "🟡", "Moderate": "🟠",
+  "Severe": "🔴", "Proliferate_DR": "🟣"
+};
+const SEVERITY_LABELS = ["None","Mild","Moderate","Severe","Proliferative"];
+const CLASS_ORDER = ["No_DR","Mild","Moderate","Severe","Proliferate_DR"];
+
+let selectedFile = null;
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('upload-section').style.display = 'none';
+    document.getElementById('result-section').style.display = 'none';
+    document.getElementById('preview-section').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetToUpload() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('upload-section').style.display = 'block';
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('result-section').style.display = 'none';
+}
+
+// ── Prediction ────────────────────────────────────────────────────────────────
+async function runPrediction() {
+  if (!selectedFile) return;
+  const btn     = document.getElementById('predict-btn');
+  const spinner = document.getElementById('spinner');
+  const label   = document.getElementById('predict-label');
+  btn.disabled  = true;
+  spinner.style.display = 'block';
+  label.textContent = 'Analysing...';
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+
+  try {
+    const res  = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showResult(data);
+  } catch(err) {
+    showToast('Error: ' + err.message);
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    label.textContent = '🔬 Analyse Retina';
+  }
+}
+
+function showResult(data) {
+  document.getElementById('preview-section').style.display = 'none';
+  const rs = document.getElementById('result-section');
+  rs.style.display = 'block';
+
+  const color = data.color;
+  const level = data.level;
+
+  // Banner
+  const banner = document.getElementById('diagnosis-banner');
+  banner.style.borderColor = color + '55';
+  banner.style.background  = data.bg;
+  document.getElementById('diag-icon').textContent = CLASS_ICONS[data.prediction];
+  document.getElementById('diag-name').textContent = data.label;
+  document.getElementById('diag-name').style.color = color;
+  document.getElementById('diag-conf').textContent = `Confidence: ${data.confidence}%`;
+
+  // Severity dots
+  document.querySelectorAll('.severity-dot').forEach(dot => {
+    const dl = parseInt(dot.dataset.level);
+    const dotColors = ['#22c55e','#eab308','#f97316','#ef4444','#a855f7'];
+    if (dl <= level) {
+      dot.style.background = dotColors[dl];
+      dot.style.color      = dotColors[dl];
+      dot.classList.add('active');
+    } else {
+      dot.style.background = 'var(--bg)';
+      dot.classList.remove('active');
+    }
+  });
+  document.getElementById('severity-text').textContent = SEVERITY_LABELS[level];
+
+  // Images
+  document.getElementById('result-original').src     = 'data:image/png;base64,' + data.original_img;
+  document.getElementById('result-preprocessed').src = 'data:image/png;base64,' + data.preprocessed_img;
+
+  // Probability bars
+  const container = document.getElementById('prob-bars');
+  container.innerHTML = '';
+  CLASS_ORDER.forEach(cls => {
+    const prob    = data.probabilities[cls] || 0;
+    const isTop   = cls === data.prediction;
+    const barColor = CLASS_COLORS[cls];
+    const row = document.createElement('div');
+    row.className = 'prob-row';
+    row.innerHTML = `
+      <span class="prob-name" style="${isTop ? 'color:var(--text);font-weight:500' : ''}">${cls.replace('_',' ')}</span>
+      <div class="prob-bar-bg">
+        <div class="prob-bar-fill" style="background:${barColor};width:0%" data-width="${prob}"></div>
+      </div>
+      <span class="prob-val" style="color:${barColor}">${prob}%</span>
+    `;
+    container.appendChild(row);
+  });
+  // Animate bars after paint
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll('.prob-bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.width + '%';
+    });
+  }));
+
+  // Advice
+  document.getElementById('advice-text').textContent   = data.advice;
+  document.getElementById('advice-action').textContent = data.action;
+  document.getElementById('advice-action').style.color        = color;
+  document.getElementById('advice-action').style.borderColor  = color + '66';
+  document.getElementById('advice-action').style.background   = color + '18';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
